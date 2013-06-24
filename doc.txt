@@ -1,0 +1,83 @@
+WordPosition
+------------
+For each page, a list of WordPositions is extracted. Each WordPosition contains 
+* the pdf coordinates (TODO: check if coordinate system is universal or if it depends on the pdf)
+* the characters that belong together
+* font type and font size
+
+Characters that are separated by space are considered different word positions.
+This makes the reading of some number formatting complex 
+For example "1 100" is 2 word positions (1 and 100), and can be 2 different numbers but also the number 1100.
+
+
+GridLine method
+---------------
+extract all visible (?) lines from the pdf (page per page) and detect if a grid can be formed
+For every formed grid, see which wordpositions fit in each cell
+
+Difficulty:
+1. some pdf's are composed of several layers of 'white' rectangles which can hide line.
+2. some tables do not contain lines
+
+White Span method
+-----------------
+This method investigates the spaces between word positions. The idea is that 2 columns are separated by a common white space.
+The main process is to build a matrix, in which the combination of 2 lines gives the number of *common* white spaces 
+when starting from line[i] and going to line[j]
+  
+             line[i]   line[j] line[j+1]
+line[i]         NA        x1        x2
+line[i+1]                 y1        y2
+
+line[i] starts with 3 large white spans (for example line[i] is a header)
+Calculate the intersection of the white spans with line[i+1]
+  
+
+Difficulty
+* very sensitive to the minimum size of a white span (defined as 1 * avgCharWidth)
+The current process is sensitive to the exact number of spans
+
+TODO: make process more robust (--> Idea: find Similarity between lines based on white spans, font type etc)
+
+Alignment Method
+----------------
+use left, right and center alignment
+Idea behind is that columns within a table are either left, right or center aligned.
+
+Complexity:
+*The coordinate of the alignment is not exactly the same (for example 3.1415 and 3.16) 
+Introduced the notion of clusters which 'cluster' coordinates that are closed (again: parameter difficult to chose)
+ 
+* Suppose one column is right aligned and contains space-separated thousands
+4 564
+7 457
+   34
+1 235
+  185
+
+--> The cluster method will identify 2 clusters, one cluster that contains all the lines, and one cluster that contains the thousand digits
+
+* Empty cells --> no word position, the cluster contains 2 groups of consecutive lines
+
+Similarity Method
+-----------------
+Idea is that the rows in a same table have similarities
+* number of word positions (not accurate due to "1 100" vs "23")
+* number of white spans
+* overlapping white spans
+* font type / font size (major one in the line, most occuring font type/size)
+* number of overlapping alignment clusters
+
+TODO: 
+1. find method that calculates a similarity between 2 lines based on a number of criteria
+2. find method that classifies a line as a row in a table
+
+ 
+
+IDEA:  build pdf with every possible font and size and extract width of space for every font
+font name, font size --> width of space
+Example:
+Arial Bold, 16 --> 3.45
+Arial Bold, 18 --> 3.60
+
+If font is not in the list, use average width

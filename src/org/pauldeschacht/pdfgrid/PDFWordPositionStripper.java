@@ -13,7 +13,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.LinkedList;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.Vector;
 
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.util.PDFTextStripper;
@@ -22,8 +25,11 @@ import org.apache.pdfbox.util.TextPosition;
 import org.apache.pdfbox.util.TextNormalize;
 import org.apache.pdfbox.util.TextPositionComparator;
 import org.apache.pdfbox.cos.COSStream;
+import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.common.PDStream;
+import org.apache.pdfbox.pdmodel.edit.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDFont;
 
 public class PDFWordPositionStripper extends PDFTextStripper
 {
@@ -34,10 +40,12 @@ public class PDFWordPositionStripper extends PDFTextStripper
      * and to correct the direction of right to left text, such as Arabic and Hebrew.
      */
     private TextNormalize normalize = null;
+    private Map<PDFont,Map<Float,Float>> _fontMap;
 
     public PDFWordPositionStripper() throws IOException
     {
 	super();
+        this._fontMap = new HashMap<PDFont,Map<Float,Float>>();
 	super.setSortByPosition(true);
 	normalize = new TextNormalize(null);
 
@@ -47,6 +55,7 @@ public class PDFWordPositionStripper extends PDFTextStripper
     public PDFWordPositionStripper(String encoding) throws IOException
     {
 	super(encoding);
+        this._fontMap = new HashMap<PDFont,Map<Float,Float>>();
 	super.setSortByPosition(true);
 	normalize = new TextNormalize(encoding);
 
@@ -446,6 +455,8 @@ public class PDFWordPositionStripper extends PDFTextStripper
 			wordPosition.setWord(s);
 			wordPosition.setRectangle(firstWordPosition.x1(), firstWordPosition.y1(),
 						  lastWordPosition.x2(), lastWordPosition.y2());
+                    wordPosition.setSpaceWidth(getSpaceWidthForFont(firstTextPosition.getFont(), firstTextPosition.getFontSize()));
+                        wordPosition.trimSpaces();
 			_wordPositions.add(wordPosition);
 		    }
 		    firstTextPosition = null;
@@ -471,6 +482,8 @@ public class PDFWordPositionStripper extends PDFTextStripper
 		    wordPosition.setWord(s);
 		    wordPosition.setRectangle(firstWordPosition.x1(), firstWordPosition.y1(),
 					      lastWordPosition.x2(), lastWordPosition.y2());
+                    wordPosition.setSpaceWidth(getSpaceWidthForFont(firstTextPosition.getFont(), firstTextPosition.getFontSize()));
+                        wordPosition.trimSpaces();
 		    _wordPositions.add(wordPosition);
 		}
 		firstTextPosition = null;
@@ -495,7 +508,9 @@ public class PDFWordPositionStripper extends PDFTextStripper
 			wordPosition.setRectangle(firstWordPosition.x1(), firstWordPosition.y1(),
 						  lastWordPosition.x2(), lastWordPosition.y2());
                                             wordPosition.fontName(firstTextPosition.getFont().getBaseFont());
-                    wordPosition.fontSize(firstTextPosition.getFontSize());
+                        wordPosition.fontSize(firstTextPosition.getFontSize());
+                    wordPosition.setSpaceWidth(getSpaceWidthForFont(firstTextPosition.getFont(), firstTextPosition.getFontSize()));
+                        wordPosition.trimSpaces();
 			_wordPositions.add(wordPosition);
 		    }
 		    firstTextPosition = null;
@@ -524,6 +539,9 @@ public class PDFWordPositionStripper extends PDFTextStripper
 					      lastWordPosition.x2(), lastWordPosition.y2());
                     wordPosition.fontName(firstTextPosition.getFont().getBaseFont());
                     wordPosition.fontSize(firstTextPosition.getFontSize());
+                    wordPosition.setPDFont(firstTextPosition.getFont());
+                    wordPosition.setSpaceWidth(getSpaceWidthForFont(firstTextPosition.getFont(), firstTextPosition.getFontSize()));
+                        wordPosition.trimSpaces();
 		    _wordPositions.add(wordPosition);
 		}
 		firstTextPosition = null;
@@ -552,5 +570,64 @@ public class PDFWordPositionStripper extends PDFTextStripper
             return separator;
         }
 
+    }
+    
+    private float getSpaceWidthForFont(PDFont font, float fontSize) {
+        
+        if (_fontMap.containsKey(font)) {
+            if(_fontMap.get(font).containsKey(fontSize)) {
+                return _fontMap.get(font).get(fontSize);
+            }
+        }
+        
+        float width = 0f;
+        try {
+            PDDocument doc = new PDDocument();
+            PDPage page = new PDPage();
+
+            doc.addPage(page);
+           // font = PDType1Font.HELVETICA_BOLD;
+
+            PDPageContentStream content = new PDPageContentStream(doc, page);
+            content.beginText();
+            content.setFont(font, fontSize);
+            content.moveTextPositionByAmount(0, 0);
+            content.drawString(" ");
+
+            content.endText();
+            content.close();
+            /*
+                PDFWordPositionStripper wordPositionStripper = new PDFWordPositionStripper();
+                wordPositionStripper.setStartPage(1);
+                wordPositionStripper.setEndPage(1);
+                wordPositionStripper.getText(doc);
+                List<WordPosition> words = wordPositionStripper.getWordPositions();
+            */
+            
+            SpaceWidthStripper stripper = new SpaceWidthStripper();
+            stripper.setStartPage(1);
+            stripper.setEndPage(1);
+            stripper.getText(doc);
+            Vector<List<TextPosition>> chars = stripper.charactersByArticle();
+            if(chars.size()>0) {
+                if (chars.get(0).size()>0) {
+                    TextPosition pos = chars.get(0).get(0);
+                    if (pos.getCharacter().equals(" ")) {
+                        width = pos.getWidth();
+                        if (_fontMap.containsKey(font)==false) {
+                            _fontMap.put(font, new HashMap<Float,Float>());
+                        }
+                        _fontMap.get(font).put(fontSize,width);
+                    }
+                }
+            }
+                  
+            //doc.save("PDFWithText.pdf");
+            doc.close();
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        
+        return width;
     }
 }

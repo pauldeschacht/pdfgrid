@@ -1,5 +1,7 @@
 package org.pauldeschacht.pdfgrid;
 
+import org.apache.pdfbox.pdmodel.font.PDFont;
+
 public class WordPosition
 {
     protected String _word;
@@ -7,6 +9,8 @@ public class WordPosition
     protected int _lineNb;
     protected String _fontName;
     protected float _fontSize;
+    protected PDFont _font;
+    protected float _spaceWidth;
     
     public WordPosition() {
 	_word = null;
@@ -31,6 +35,17 @@ public class WordPosition
 	_y2 = y2;
     }
     
+    public void trimSpaces() {
+        while(_word.startsWith(" ") == true) {
+            _word = _word.substring(1,_word.length());
+            _x1 += _spaceWidth;
+        }
+        while(_word.endsWith(" ")==true) {
+            _word = _word.substring(0,_word.length());
+            _x2 -= _spaceWidth;
+        }
+    }
+    
     public void setLineNb(int lineNb) {
         _lineNb = lineNb;
     }
@@ -40,6 +55,12 @@ public class WordPosition
     }
 
     public float height() { return Math.max(_y1,_y2) - Math.min(_y1,_y2); }
+    
+    public PDFont getPDFont() { return _font; }
+    public void setPDFont(PDFont font) { _font = font; }
+    
+    public void setSpaceWidth(float spaceWidth) { _spaceWidth = spaceWidth; }
+    public float getSpaceWidth() { return _spaceWidth; }
     
     
     public void fontName(String fontName) { _fontName = fontName; }

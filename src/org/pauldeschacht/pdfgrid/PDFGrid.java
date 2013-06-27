@@ -12,11 +12,17 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.Vector;
 
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.edit.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.util.PDFTextStripper;
+import org.apache.pdfbox.util.TextPosition;
 
 public class PDFGrid {
 
@@ -110,7 +116,7 @@ public class PDFGrid {
                 wordPositionStripper.getText(document);
                 List<WordPosition> words = wordPositionStripper.getWordPositions();
 
-
+                
                 // create csv file: page, x1, y1, x2, y2, word
                 for (WordPosition word : words) {
                     wpbw.write(Integer.toString(pageNb) + "\t");
@@ -144,7 +150,7 @@ public class PDFGrid {
 
                 //tryWithAlignment(words,numLines);
 
-                tryWithAlignmentClusters(words, numLines);
+                //tryWithAlignmentClusters(words, numLines);
                 
                 //break;
 
@@ -186,7 +192,7 @@ public class PDFGrid {
                         counters[i][j] = spans.size();
 
                         //System.out.println(i + "," + j + "," + spans.size() + " " + lines.get(i).get(0).word());
-                        System.out.println(i + "," + j + "," + spans.size());
+                        //System.out.println(i + "," + j + "," + spans.size());
                         if (spans.isEmpty()) {
                             break;
                         }
@@ -213,10 +219,10 @@ public class PDFGrid {
                         startRow++;
                     }
 
-                    System.out.println("TABLE start row" + startRow + ", identical #lines: " + nb + ", nb spans " + spans.size() + "  -------------------------");
+                    //System.out.println("TABLE start row" + startRow + ", identical #lines: " + nb + ", nb spans " + spans.size() + "  -------------------------");
 
                     for (int i = startRow; i < startRow + nb; i++) {
-                        printLineAccordingSpan(lines.get(i), spans);
+                        //printLineAccordingSpan(lines.get(i), spans);
                     }
                 }
                 /*
@@ -442,7 +448,7 @@ public class PDFGrid {
         while (row < identicals.length) {
             int skip = identicals[row];
             int val = values[row];
-            System.out.println("[" + row + "] => " + skip);
+            //System.out.println("[" + row + "] => " + skip);
             if (val > 0) {
                 boolean found = false;
                 //see if a bigger values follows within skip lines
@@ -550,7 +556,7 @@ public class PDFGrid {
                     num++;
                 } else {
                     if (prevPresent == 1 && num > 3) {
-                        System.out.println("Coordinate " + coordinate + " has " + num + " left aligned lines ending with line " + i);
+                        //System.out.println("Coordinate " + coordinate + " has " + num + " left aligned lines ending with line " + i);
                     }
                     prevPresent = lines[i];
                     num = 0;
@@ -570,7 +576,7 @@ public class PDFGrid {
                     num++;
                 } else {
                     if (prevPresent == 1 && num > 3) {
-                        System.out.println("Coordinate " + coordinate + " has " + num + " right aligned lines ending with line " + i);
+                        //System.out.println("Coordinate " + coordinate + " has " + num + " right aligned lines ending with line " + i);
                     }
                     prevPresent = lines[i];
                     num = 0;
@@ -600,7 +606,7 @@ public class PDFGrid {
                 } else {
                     if (prevPresent == 1 && num > 3) {
                         Span s = mergedClusters.get(i).getSpan();
-                        System.out.println("Cluster " + s.f1() + "-" + s.f2() + " has " + num + " words right aligned, ending on line " + j);
+                        //System.out.println("Cluster " + s.f1() + "-" + s.f2() + " has " + num + " words right aligned, ending on line " + j);
                     }
                     prevPresent = rightMatrix[i][j];
                     num = 0;
@@ -752,43 +758,72 @@ public class PDFGrid {
             
             lineFeatures[i] = similarityLines(words1, i, words2, i+1, alignmentMatrix,pageWidth);
             
-            System.out.println("lines " + i + " and " + (i+1) + " pixel increase " + lineFeatures[i][6]);
+            //System.out.println("lines " + i + " and " + (i+1) + " pixel increase " + lineFeatures[i][6]);
         }
         normalizeSimilarityMatrix(lineFeatures);
         
         float[] similarities = calcRelativeSimilarities(lineFeatures);
         
+        int rows=0;
+        boolean bFirstRow=true;
         for(int i=0; i<numLines-1; i++) {
             float[] line = lineFeatures[i];
+            /*
             System.out.print("Similarity line " + i + " and " + (i+1) + ": " + similarities[i] + " features: ");
             for(int feature=0; feature<line.length;feature++) {
                 System.out.print(line[feature] + ", ");
             }
             System.out.println();
-            
+            */
             
             //TODO: once similar lines are detected --> extract x lines
             //currently only works with right aligned cluster
-            if(similarities[i] > 0.90) {
-                printAccordingRightAlignedCluster(lines.get(i), mergedClusters);
-            }
             
+            //i and i+1 are similar and both have more than 3 aligned words ==> similar lines in table
+            if(similarities[i] > 0.90 && getNumAlignedWords(alignmentMatrix, i, i+1) > 3) {
+                if(bFirstRow==true) {
+                    System.out.println(">>-------------");
+                    printAccordingRightAlignedCluster(lines.get(i), mergedClusters);
+                    bFirstRow=false;
+                }
+                printAccordingRightAlignedCluster(lines.get(i+1), mergedClusters);
+            }
+            else {
+                System.out.println("<<-------------");
+                System.out.println(similarities[i]);
+                bFirstRow=true;
+            }     
         }
+        System.out.println("$$$$$$$$$$$$$$$");
     }
     
-    static void printAccordingRightAlignedCluster(List<WordPosition> words, List<WordCluster> clusters) {
-        for(WordCluster cluster: clusters) {
-            
-            System.out.print(words.get(0).getLineNb() + "\t");
-            for(WordPosition word: words) {
-                if(word.x2() < cluster.getSpan().f2()) {
-                    System.out.print(word.word() + "\t");
-                }
-                else {
-                    break;
-                }
+    static int getNumAlignedWords(int[][] alignmentMatrix, int lineNb1, int lineNb2) {
+            //ALIGNMENT CLUSTER
+        int alignment1 = 0;
+        int alignment2 = 0;
+        int equalAlignment = 0;
+        for(int i=0; i<alignmentMatrix.length;i++) {
+                alignment1 += alignmentMatrix[i][lineNb1];
+                alignment2 += alignmentMatrix[i][lineNb2];
+                if(alignmentMatrix[i][lineNb1] == alignmentMatrix[i][lineNb2]) {
+                    equalAlignment++;
             }
+                
         }
+        return equalAlignment;
+    }
+    static void printAccordingRightAlignedCluster(List<WordPosition> words, List<WordCluster> clusters) {
+        System.out.print(words.get(0).getLineNb() + "\t");
+
+        int i = 0;
+        for (WordCluster cluster : clusters) {
+                while(i<words.size() && words.get(i).x2() < cluster.getSpan().f2()) {
+                    System.out.print(words.get(i).word() + "\t");
+                    i++;
+                }
+            
+        }
+        System.out.println();
     }
     
     static float absIncrease(float f1, float f2) {
@@ -839,9 +874,9 @@ public class PDFGrid {
         float equalAlignmentPercentage = (float)equalAlignment / (float)alignmentMatrix.length;
         
         //WORDS IN PIXELS
-        float numWordsInPixels1 = getWordsInPixels(line1);
-        float numWordsInPixels2 = getWordsInPixels(line2);
-        float numWordsInPixelsIncrease = absIncrease(numWordsInPixels1, numWordsInPixels2);
+        float wordsInPixels1 = getWordsInPixels(line1);
+        float wordsInPixels2 = getWordsInPixels(line2);
+        float wordsInPixelsIncrease = absIncrease(wordsInPixels1, wordsInPixels2);
  
         float[] features = new float[7];
         features[0] = numWordsIncrease;
@@ -850,7 +885,7 @@ public class PDFGrid {
         features[3] = fontSimilarity;
         features[4] = alignmentIncrease;
         features[5] = equalAlignmentPercentage;
-        features[6] = numWordsInPixelsIncrease;
+        features[6] = wordsInPixelsIncrease;
         
         return features;
     }
@@ -899,7 +934,7 @@ public class PDFGrid {
         weights[3] = 0.01f; //fontSimilarity;
         weights[4] = 0.30f; //alignmentIncrease
         weights[5] = 0.45f; //equalAlignmentPercentage;
-        weights[6] = 0f;    //numWordsInPixelsIncrease;
+        weights[6] = 0f;    //wordsInPixelsIncrease;
         
         for(int i=0; i<similarityMatrix.length; i++) {
             float[] line = similarityMatrix[i];
@@ -912,13 +947,14 @@ public class PDFGrid {
     }
     
     static float calcAverageCharWidth(List<WordPosition> words) {
-        int totalLen = 0;
-        float totalWidth = 0f;
+        float totalLen = 0;
+        //float totalWidth = 0f;
         for (WordPosition word : words) {
-            totalLen += word.word().length();
-            totalWidth += (word.x2() - word.x1());
+            //totalLen += word.word().length();
+            //totalWidth += (word.x2() - word.x1());
+            totalLen += word.getSpaceWidth();
         }
-        return totalWidth / totalLen;
+        return totalLen /= words.size();
     }
     
     static float getWordsInPixels(List<WordPosition> words) {
@@ -951,8 +987,6 @@ public class PDFGrid {
             }
         }
         return result;
-    }
-    
-    
+    } 
 
 }

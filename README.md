@@ -1,7 +1,7 @@
 pdfgrid
 =======
 
-This project is a playground to automated some of the data extraction.
+This project is a playground to automate some of the data extraction.
 
 The goal is to extract 'tabular' data from pdf files.
 A lot of public data is still hidden within PDF reports. Although tools such as PDF2XL exist, I want to create an automated, command line driven application which extracts tabular data from PDF files.

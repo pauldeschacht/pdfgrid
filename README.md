@@ -14,9 +14,13 @@ Current method is based on alignment detection (left, center and right) of sever
 This method gives good results except when the thousand separator is a space. 
 
 1 000
+
     6
+    
   756
+  
 2 345
+
 
 In this case, the current method detects 2 columns (with empty values in the first column). 
 

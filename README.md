@@ -11,15 +11,15 @@ There is no extact method to define lines and tabular data, therefore this is an
 Initial methods such as line detection work well, but not all tables have lines. I want to create an application with no/little requirements on the PDF data.
 
 Current method is based on alignment detection (left, center and right) of several consecutive lines, combined with positional clustering. 
-This method gives good results except when the thousand separator is a space. 
+This method gives good results except whith right aligned number and space as the thousand separator. 
 
-1\_000
+|1|000|
 
-\_\__\_6
+||6|
     
-\_\_756
+||756|
   
-2\_345
+|2|345|
 
 
 In this case, the current method detects 2 columns (with empty values in the first column). 

@@ -13,13 +13,13 @@ Initial methods such as line detection work well, but not all tables have lines.
 Current method is based on alignment detection (left, center and right) of several consecutive lines, combined with positional clustering. 
 This method gives good results except when the thousand separator is a space. 
 
-1 000
+1\_000
 
-    6
+\_\__\_6
     
-  756
+\_\_756
   
-2 345
+2\_345
 
 
 In this case, the current method detects 2 columns (with empty values in the first column). 

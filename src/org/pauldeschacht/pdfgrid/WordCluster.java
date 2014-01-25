@@ -33,6 +33,7 @@ public class WordCluster {
     
     void addWord(float coordinate, WordPosition word) {
         _words.add(word);
+        HALF_DELTA = Math.min(HALF_DELTA, word.getSpaceWidth()/2);
         _start = Math.min(coordinate-HALF_DELTA, _start);
         _end = Math.max(coordinate+HALF_DELTA, _end);
     }

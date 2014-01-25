@@ -17,6 +17,16 @@ public class WordPosition
         _lineNb = -1;
     }
     
+    public boolean isNumber() {
+        for(int i=0; i<_word.length(); i++) {
+            char c = _word.charAt(i);
+            if (c < '0' && c > '9' && c != ',' && c != '.' && c != ' ') {
+                return false;
+            }
+        }
+        return true;
+    }
+    
     public void setWord(String word) {
 	_word = word;
     }
@@ -71,10 +81,16 @@ public class WordPosition
     public String toString() 
     {
 	return Float.toString(_x1) + "\t" + 
-                Float.toString(_y1) + "\t" + 
                 Float.toString(_x2) + "\t" + 
+                Float.toString(_y1) + "\t" + 
                 Float.toString(_y2) + "\t" + 
                 _word;
+    }
+    
+    public void merge(WordPosition other) {
+        _word = _word + " " + other.word();
+        _x1 = Math.min(_x1, other.x1());
+        _x2 = Math.max(_x2, other.x2());
     }
     
 }

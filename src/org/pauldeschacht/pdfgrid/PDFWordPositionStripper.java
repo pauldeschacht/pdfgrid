@@ -254,6 +254,8 @@ public class PDFWordPositionStripper extends PDFTextStripper
                  * make a true average (average of averages) but we found that it gave the
                  * best results after numerous experiments. Based on experiments we also found that
                  * .3 worked well. */
+                
+                /*
                 float averageCharWidth = -1;
                 if(previousAveCharWidth < 0)
                 {
@@ -265,7 +267,10 @@ public class PDFWordPositionStripper extends PDFTextStripper
                 }
 
                 float deltaCharWidth = (averageCharWidth * getAverageCharTolerance());
-
+                * */
+                float averageCharWidth = getSpaceWidthForFont(position.getFont(),position.getFontSize());
+                float deltaCharWidth = (averageCharWidth); // * getAverageCharTolerance());
+                
                 //Compares the values obtained by the average method and the wordSpacing method and picks
                 //the smaller number.
                 float expectedStartOfNextWordX = EXPECTEDSTARTOFNEXTWORDX_RESET_VALUE;

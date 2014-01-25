@@ -77,7 +77,7 @@ public class PDFGrid {
             List pages = document.getDocumentCatalog().getAllPages();
             for (int pageNb = 1; pageNb <= pages.size(); pageNb++) {
                 System.out.println("Page = " + pageNb);
-                if (pageNb != 7) {
+                if (pageNb != 8) {
                         continue;
                 }
                 
@@ -173,7 +173,40 @@ public class PDFGrid {
                 }
                 wpLinebw.flush();
 
-                tryWithSimilarityMatrix(lines,pageWidth,pageHeight);
+                
+                //deal the space as a thousand separator
+                for(Map.Entry<Integer,List<WordPosition>> kv: lines.entrySet()) {
+                    Integer lineN = kv.getKey();
+                    List<WordPosition> line = kv.getValue();
+                    
+                    int i=0;
+                    while(i<line.size()-1) {
+                        WordPosition w1 = line.get(i);
+                        WordPosition w2 = line.get(i+1);
+                        if(w1.isNumber() && w2.isNumber() && (w1.x2() + (1.5f * w1.getSpaceWidth()) > w2.x1())) {
+                            //if both words are numbers and the space between the words is small (bit more than space width) --> merge the 2 words
+                            w1.merge(w2);
+                            line.remove(i+1);
+                        }
+                        else {
+                            i++;
+                        }
+                    }
+                }
+
+                List<List<List<String>>> tables = tryWithSimilarityMatrix(lines,pageWidth,pageHeight);
+                for(List<List<String>> table : tables) {
+                    for(List<String> row: table) {
+                        for(String cell: row) {
+                            System.out.print(cell);
+                            System.out.print("\t|");
+                        }
+                        System.out.println();
+                    }
+                    System.out.println("------------------------------------");
+                }
+                
+                
                 
                 //prepare the counter matrix
                 int[][] counters = new int[numLines][numLines];
@@ -415,6 +448,52 @@ public class PDFGrid {
         }
         System.out.println();
     }
+    
+    static List<String> splitLineAccordingSpan(List<WordPosition> line, List<Span> spans) {
+        List<String> strings = new ArrayList<String>();
+        String currentString = "";
+        int i = 0;
+        int j = 0;
+        while (i < line.size() && j < spans.size()) {
+            WordPosition word = line.get(i);
+            Span span = spans.get(j);
+
+            if (word.x2() <= span.f1()) {
+                //System.out.print(word.word());
+                //System.out.print(" ");
+                currentString += word.word();
+                currentString += " ";
+                i++;
+            } else {
+                strings.add(currentString);
+                currentString = "";
+                //System.out.print("\t");
+                j++;
+            }
+        }
+        if( i<line.size()) {
+            while (i < line.size()) {
+                WordPosition word = line.get(i);
+                //System.out.print(word.word());
+                //System.out.print(" ");
+                currentString += word.word();
+                currentString += " ";
+                i++;
+            }
+            strings.add(currentString);
+        }
+        else {
+            while (j < spans.size()) {
+                //System.out.print("\t");
+                currentString = "";
+                strings.add(currentString);
+                j++;
+            }
+        }
+        //System.out.println();
+        return strings;
+    }
+    
 
     static List<Range> findPerfectTable(int[][] counters, Map<Integer, List<WordPosition>> lines) {
         List<Range> perfectRanges = new ArrayList<Range>();
@@ -742,7 +821,7 @@ public class PDFGrid {
     }
     
     
-    static void tryWithSimilarityMatrix(Map<Integer, List<WordPosition>> lines,float pageWidth, float pageHeight) {
+    static List<List<List<String>>> tryWithSimilarityMatrix(Map<Integer, List<WordPosition>> lines,float pageWidth, float pageHeight) {
             
         int numLines = lines.size();
         
@@ -764,8 +843,11 @@ public class PDFGrid {
         
         float[] similarities = calcRelativeSimilarities(lineFeatures);
         
-        int rows=0;
         boolean bFirstRow=true;
+        
+        List<List<List<WordPosition>>> tables = new ArrayList<List<List<WordPosition>>>();
+
+        ArrayList<List<WordPosition>> currentTable = null;
         for(int i=0; i<numLines-1; i++) {
             float[] line = lineFeatures[i];
             /*
@@ -782,19 +864,54 @@ public class PDFGrid {
             //i and i+1 are similar and both have more than 3 aligned words ==> similar lines in table
             if(similarities[i] > 0.90 && getNumAlignedWords(alignmentMatrix, i, i+1) > 3) {
                 if(bFirstRow==true) {
-                    System.out.println(">>-------------");
-                    printAccordingRightAlignedCluster(lines.get(i), mergedClusters);
+                    //System.out.println(">>-------------");
+                    currentTable = new ArrayList<List<WordPosition>>();
+                    tables.add(currentTable);
+                    //currentTable.add(lines.get(i));
+                    currentTable.add(lines.get(i));
+                    //printAccordingRightAlignedCluster(lines.get(i), mergedClusters);
                     bFirstRow=false;
                 }
-                printAccordingRightAlignedCluster(lines.get(i+1), mergedClusters);
+                //printAccordingRightAlignedCluster(lines.get(i+1), mergedClusters);
+                    //copy line into the current table: cannot copy from List<WordPosition> to ArrayList<WordPosition>
+                currentTable.add(lines.get(i+1));
+                
             }
             else {
-                System.out.println("<<-------------");
-                System.out.println(similarities[i]);
+                //System.out.println("<<-------------");
+                //System.out.println(similarities[i]);
                 bFirstRow=true;
             }     
         }
-        System.out.println("$$$$$$$$$$$$$$$");
+        //remove tables with less than 2 rows and transformed fomr WordPosition to String
+        List<List<List<String>>> stringifiedTables = new ArrayList<List<List<String>>>();
+        
+        List<Span> spans = new ArrayList<Span>();
+        for (WordCluster cluster : mergedClusters) {
+            Span span = cluster.getSpan();
+            spans.add(span);
+        }
+
+        int i=0;
+        while(i<tables.size()) {
+            List<List<WordPosition>> table = tables.get(i);
+            if(table.size()<2) {
+                tables.remove(i);
+            }
+            else {
+                List<List<String>> stringifiedTable = new ArrayList<List<String>>();
+
+                for(List<WordPosition> words: table) {
+                    List<String> strings =  splitLineAccordingSpan(words,spans);
+                    stringifiedTable.add(strings);
+                }
+                
+                stringifiedTables.add(stringifiedTable);
+                i++;
+            }
+        }
+        return stringifiedTables;
+        //System.out.println("$$$$$$$$$$$$$$$");
     }
     
     static int getNumAlignedWords(int[][] alignmentMatrix, int lineNb1, int lineNb2) {
@@ -815,15 +932,12 @@ public class PDFGrid {
     static void printAccordingRightAlignedCluster(List<WordPosition> words, List<WordCluster> clusters) {
         System.out.print(words.get(0).getLineNb() + "\t");
 
-        int i = 0;
+        List<Span> spans = new ArrayList<Span>();
         for (WordCluster cluster : clusters) {
-                while(i<words.size() && words.get(i).x2() < cluster.getSpan().f2()) {
-                    System.out.print(words.get(i).word() + "\t");
-                    i++;
-                }
-            
+            Span span = cluster.getSpan();
+            spans.add(span);
         }
-        System.out.println();
+        printLineAccordingSpan(words,spans);
     }
     
     static float absIncrease(float f1, float f2) {

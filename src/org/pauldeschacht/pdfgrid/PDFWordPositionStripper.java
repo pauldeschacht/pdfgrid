@@ -267,7 +267,7 @@ public class PDFWordPositionStripper extends PDFTextStripper
                 }
 
                 float deltaCharWidth = (averageCharWidth * getAverageCharTolerance());
-                * */
+                */
                 float averageCharWidth = getSpaceWidthForFont(position.getFont(),position.getFontSize());
                 float deltaCharWidth = (averageCharWidth); // * getAverageCharTolerance());
                 

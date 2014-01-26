@@ -19,7 +19,7 @@ public class Span {
         _f1 = f1;
         _f2 = f2;
         if (_f1 >= f2) {
-            System.out.println("ERROR WRONG SPAN");
+            System.out.println("ERROR WRONG SPAN" + _f1 + " , " + _f2 );
         }
     }
     

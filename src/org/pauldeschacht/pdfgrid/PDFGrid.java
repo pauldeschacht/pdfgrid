@@ -33,6 +33,9 @@ public class PDFGrid {
 
     public static void main(String[] args) throws Exception {
         String filename = args[0];
+        if (filename == null) {
+            filename = "/Users/pauldeschacht/dev/pdfgrid/data/CAAC2012.pdf";
+        }
         File file = new File(filename);
         if (file.isFile() && file.getName().endsWith(".pdf")) {
             parseFile(file.getAbsolutePath());
@@ -77,7 +80,7 @@ public class PDFGrid {
             List pages = document.getDocumentCatalog().getAllPages();
             for (int pageNb = 1; pageNb <= pages.size(); pageNb++) {
                 System.out.println("Page = " + pageNb);
-                if (pageNb != 8) {
+                if (pageNb != 1) {
                         continue;
                 }
                 
@@ -175,6 +178,7 @@ public class PDFGrid {
 
                 
                 //deal the space as a thousand separator
+                
                 for(Map.Entry<Integer,List<WordPosition>> kv: lines.entrySet()) {
                     Integer lineN = kv.getKey();
                     List<WordPosition> line = kv.getValue();
@@ -193,6 +197,7 @@ public class PDFGrid {
                         }
                     }
                 }
+                
 
                 List<List<List<String>>> tables = tryWithSimilarityMatrix(lines,pageWidth,pageHeight);
                 for(List<List<String>> table : tables) {
@@ -864,22 +869,22 @@ public class PDFGrid {
             //i and i+1 are similar and both have more than 3 aligned words ==> similar lines in table
             if(similarities[i] > 0.90 && getNumAlignedWords(alignmentMatrix, i, i+1) > 3) {
                 if(bFirstRow==true) {
-                    //System.out.println(">>-------------");
+                    System.out.println(">>-------------");
                     currentTable = new ArrayList<List<WordPosition>>();
                     tables.add(currentTable);
                     //currentTable.add(lines.get(i));
                     currentTable.add(lines.get(i));
-                    //printAccordingRightAlignedCluster(lines.get(i), mergedClusters);
+                    printAccordingRightAlignedCluster(lines.get(i), mergedClusters);
                     bFirstRow=false;
                 }
-                //printAccordingRightAlignedCluster(lines.get(i+1), mergedClusters);
+                printAccordingRightAlignedCluster(lines.get(i+1), mergedClusters);
                     //copy line into the current table: cannot copy from List<WordPosition> to ArrayList<WordPosition>
                 currentTable.add(lines.get(i+1));
                 
             }
             else {
-                //System.out.println("<<-------------");
-                //System.out.println(similarities[i]);
+                System.out.println("<<-------------");
+                System.out.println(similarities[i]);
                 bFirstRow=true;
             }     
         }
@@ -930,14 +935,26 @@ public class PDFGrid {
         return equalAlignment;
     }
     static void printAccordingRightAlignedCluster(List<WordPosition> words, List<WordCluster> clusters) {
-        System.out.print(words.get(0).getLineNb() + "\t");
+//        System.out.print(words.get(0).getLineNb() + "\t");
+//
+//        List<Span> spans = new ArrayList<Span>();
+//        for (WordCluster cluster : clusters) {
+//            Span span = cluster.getSpan();
+//            spans.add(span);
+//        }
+//        printLineAccordingSpan(words,spans);
+               System.out.print(words.get(0).getLineNb() + "\t|");
 
-        List<Span> spans = new ArrayList<Span>();
+        int i = 0;
         for (WordCluster cluster : clusters) {
-            Span span = cluster.getSpan();
-            spans.add(span);
+                while(i<words.size() && words.get(i).x2() < cluster.getSpan().f2()) {
+                    System.out.print(words.get(i).word() + " ");
+                    i++;
+                }
+                System.out.print("\t|");
+            
         }
-        printLineAccordingSpan(words,spans);
+        System.out.println();
     }
     
     static float absIncrease(float f1, float f2) {

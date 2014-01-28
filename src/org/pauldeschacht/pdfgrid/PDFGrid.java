@@ -69,7 +69,6 @@ public class PDFGrid {
         FileWriter wpLinefw = new FileWriter(wpLineFile.getAbsoluteFile());
         BufferedWriter wpLinebw = new BufferedWriter(wpLinefw);
 
-
         System.out.println("Processing file " + pdfFile);
         PDDocument document = null;
         try {
@@ -80,11 +79,11 @@ public class PDFGrid {
             List pages = document.getDocumentCatalog().getAllPages();
             for (int pageNb = 1; pageNb <= pages.size(); pageNb++) {
                 System.out.println("Page = " + pageNb);
-                if (pageNb != 1) {
+                if (pageNb != 8) {
                         continue;
                 }
                 
-                PDPage page = (PDPage)pages.get(pageNb);
+                PDPage page = (PDPage)pages.get(pageNb-1);
                 PDRectangle cropBox = page.findCropBox();
                 float pageWidth = cropBox.getWidth();
                 float pageHeight = cropBox.getHeight();
@@ -122,7 +121,7 @@ public class PDFGrid {
                 
                 // create csv file: page, x1, y1, x2, y2, word
                 for (WordPosition word : words) {
-                    wpbw.write(Integer.toString(pageNb) + "\t");
+                    wpbw.write(Integer.toString(pageNb) + ";");
                     wpbw.write(word.toString());
                     wpbw.write("\n");
                 }
@@ -161,8 +160,8 @@ public class PDFGrid {
                 // csv file: page, line, x1,y1,x2,y2, word
                 Map<Integer, List<WordPosition>> lines = new HashMap<Integer, List<WordPosition>>();
                 for (WordPosition word : words) {
-                    wpLinebw.write(Integer.toString(pageNb) + "\t");
-                    wpLinebw.write(Integer.toString(word.getLineNb()) + "\t");
+                    wpLinebw.write(Integer.toString(pageNb) + ";");
+                    wpLinebw.write(Integer.toString(word.getLineNb()) + ";");
                     wpLinebw.write(word.toString());
                     wpLinebw.write("\n");
 
@@ -199,7 +198,7 @@ public class PDFGrid {
                 }
                 
 
-                List<List<List<String>>> tables = tryWithSimilarityMatrix(lines,pageWidth,pageHeight);
+                List<List<List<String>>> tables = tryWithSimilarityMatrix(lines,pageWidth,pageHeight,pdfFile,pageNb);
                 for(List<List<String>> table : tables) {
                     for(List<String> row: table) {
                         for(String cell: row) {
@@ -698,6 +697,41 @@ public class PDFGrid {
             }
         }
     }
+
+    static void writeWordClusters(String pdfFile, int page, List<WordCluster> clusters) {
+        try {
+            String wpWordClustersFilename = pdfFile + "-wordClusters.csv";
+            File wpWordClusters = new File(wpWordClustersFilename);
+            if (!wpWordClusters.exists()) {
+                wpWordClusters.createNewFile();
+            }
+            FileWriter wpWordClustersfw = new FileWriter(wpWordClusters.getAbsoluteFile(),true);
+            BufferedWriter wpWordClustersbw = new BufferedWriter(wpWordClustersfw);
+            
+            int clusterIndex = 0;
+            for(WordCluster wc: clusters) {
+                
+                for(WordPosition wp:wc.getWords()) {
+                    wpWordClustersbw.write(Integer.toString(page) + "\t");
+                    wpWordClustersbw.write(Integer.toString(clusterIndex) + "\t");
+                    wpWordClustersbw.write(Float.toString(wc.getSpan().f1()) + "\t");
+                    wpWordClustersbw.write(Float.toString(wc.getSpan().f2()) + "\t");
+                    wpWordClustersbw.write(wp.toString(" ") + ",");
+                    wpWordClustersbw.write("\n");
+                }
+                clusterIndex++;
+
+
+                
+                        
+            }
+            wpWordClustersbw.flush();
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
     static List<WordCluster> buildRightAlignedClusters(Map<Integer,List<WordPosition>> lines) {
         List<WordPosition> words = new ArrayList<WordPosition>();
         for(Map.Entry<Integer,List<WordPosition>> kv : lines.entrySet()) {
@@ -726,6 +760,32 @@ public class PDFGrid {
             }
         }
         return rightClusters;
+    }
+    static List<WordCluster> buildLeftAlignedClusters(Map<Integer,List<WordPosition>> lines) {
+        List<WordPosition> words = new ArrayList<WordPosition>();
+        for(Map.Entry<Integer,List<WordPosition>> kv : lines.entrySet()) {
+            for(WordPosition word: kv.getValue()) {
+                words.add(word);
+            }
+        }
+        List<WordCluster> leftClusters = new ArrayList<WordCluster>();
+        for (WordPosition word : words) {
+            boolean bAdded = false;
+            for (WordCluster c : leftClusters) {
+                if (c.doesBelongToCluster(word.x1()) == true) {
+                    c.addWord(word.x1(), word);
+                    bAdded = true;
+                    break;
+                }
+            }
+            if (bAdded == false) {
+                WordCluster c = new WordCluster();
+                c.addWord(word.x1(), word);
+                leftClusters.add(c);
+            }
+        }
+        return leftClusters;
+        
     }
     
     /*
@@ -826,15 +886,99 @@ public class PDFGrid {
     }
     
     
-    static List<List<List<String>>> tryWithSimilarityMatrix(Map<Integer, List<WordPosition>> lines,float pageWidth, float pageHeight) {
+    static void wordPositionSetCluster(List<WordCluster> clusters, List<WordPosition> words, int clusterIndex) {
+        for(int i=0;i<clusters.size();i++) {
+            WordCluster cluster = clusters.get(i);
+            for(WordPosition wp: cluster.getWords()) {
+                wp._clusterRef[clusterIndex] = i;
+            }
+        }
+        
+    }
+    static List<WordCluster> unifiedWordCluster(List<WordCluster> rightClusters1, List<WordCluster> leftClusters, List<WordPosition> words) {
+    
+        List<WordCluster>  unifiedCluster = new ArrayList<WordCluster>();
+        // 1 --> right aligned
+        // 2 --> left aligned
+        for(WordPosition wp : words) {
+            int lineNb = wp.getLineNb();
+            WordCluster c1 = rightClusters1.get(wp._clusterRef[0]);
+            WordCluster c2 = leftClusters.get(wp._clusterRef[1]);
+            
+            int aligned1 = c1.getAlignedLines(lineNb);
+            int aligned2 = c2.getAlignedLines(lineNb);
+            
+            float x;
+            if (aligned1 > aligned2 ) {
+                x = wp.x2();
+            }
+            else {
+                x = wp.x1();
+            }
+            
+            boolean bAdded=false;
+            for(WordCluster cluster:unifiedCluster) {
+                if (cluster.doesBelongToCluster(x) == true) {
+                    cluster.addWord(x, wp);
+                    bAdded=true;
+                    break;
+                }
+            }
+            if(!bAdded) {
+                WordCluster cluster = new WordCluster();
+                cluster.addWord(x, wp);
+                unifiedCluster.add(cluster);
+            }
+        }
+        Collections.sort(unifiedCluster, new Comparator<WordCluster>() {
+            @Override
+            public int compare(WordCluster c1, WordCluster c2) {
+                float f1 = c1.getSpan().f1();
+                float f2 = c2.getSpan().f1();
+                if (f1 < f2) {
+                    return -1;
+                } else if (f1 > f2) {
+                    return 1;
+                }
+                return 0;
+            }
+        });
+        wordPositionSetCluster(unifiedCluster,words,3);
+        return unifiedCluster;
+    }
+        
+    static List<List<List<String>>> tryWithSimilarityMatrix(Map<Integer, List<WordPosition>> lines,float pageWidth, float pageHeight, String pdfFile, int pageNb) {
             
         int numLines = lines.size();
         
         float[][] lineFeatures = new float[numLines-1][]; 
     
         List<WordCluster> rightClusters = buildRightAlignedClusters(lines);
-        List<WordCluster> mergedClusters = mergeClusters(rightClusters);
+        List<WordCluster> mergedRightClusters = mergeClusters(rightClusters);
+        for(WordCluster cluster: mergedRightClusters) {
+            cluster.calcAlignedLines();
+        }
+        
+        List<WordCluster> leftClusters = buildLeftAlignedClusters(lines);
+        List<WordCluster> mergedLeftClusters = mergeClusters(leftClusters);
+        for(WordCluster cluster: mergedLeftClusters) {
+            cluster.calcAlignedLines();
+        }
+        
+        List<WordPosition> listOfWords = new ArrayList<WordPosition>();
+        for(Map.Entry<Integer,List<WordPosition>> kv : lines.entrySet()) {
+            for(WordPosition word: kv.getValue()) {
+                listOfWords.add(word);
+            }
+        }
+        wordPositionSetCluster(mergedRightClusters,listOfWords,0);
+        wordPositionSetCluster(mergedLeftClusters,listOfWords,1);
+
+        List<WordCluster> mergedClusters = unifiedWordCluster(mergedRightClusters, mergedLeftClusters,listOfWords);
+
         int[][] alignmentMatrix = buildAlignmentMatrix(mergedClusters,numLines);
+        
+        writeWordClusters(pdfFile,pageNb, mergedClusters);
         
         for(int i=0; i<numLines-1; i++) {
             List<WordPosition> words1 = lines.get(i);
@@ -874,10 +1018,10 @@ public class PDFGrid {
                     tables.add(currentTable);
                     //currentTable.add(lines.get(i));
                     currentTable.add(lines.get(i));
-                    printAccordingRightAlignedCluster(lines.get(i), mergedClusters);
+                    printAccordingCluster(lines.get(i), mergedClusters);
                     bFirstRow=false;
                 }
-                printAccordingRightAlignedCluster(lines.get(i+1), mergedClusters);
+                printAccordingCluster(lines.get(i+1), mergedClusters);
                     //copy line into the current table: cannot copy from List<WordPosition> to ArrayList<WordPosition>
                 currentTable.add(lines.get(i+1));
                 
@@ -934,6 +1078,20 @@ public class PDFGrid {
         }
         return equalAlignment;
     }
+    static void printAccordingCluster(List<WordPosition> words, List<WordCluster> clusters) {
+
+        for(int i=0; i<clusters.size(); i++) {
+            for(WordPosition word: words) {
+                int clusterIndex = word._clusterRef[3];
+                if (clusterIndex == i) {
+                    System.out.print(word.word());
+                }
+            }
+            System.out.print("\t|");
+        }
+        System.out.println("");
+    }
+    
     static void printAccordingRightAlignedCluster(List<WordPosition> words, List<WordCluster> clusters) {
 //        System.out.print(words.get(0).getLineNb() + "\t");
 //
@@ -947,7 +1105,7 @@ public class PDFGrid {
 
         int i = 0;
         for (WordCluster cluster : clusters) {
-                while(i<words.size() && words.get(i).x2() < cluster.getSpan().f2()) {
+                while(i<words.size() && words.get(i).x2() <= cluster.getSpan().f2()) {
                     System.out.print(words.get(i).word() + " ");
                     i++;
                 }

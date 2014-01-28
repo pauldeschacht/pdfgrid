@@ -12,9 +12,21 @@ public class WordPosition
     protected PDFont _font;
     protected float _spaceWidth;
     
+    public int _clusterRef[] = new int[4];
+    /*
+     * 0 RIGHT ALIGNED
+     * 1 LEFT ALIGNED
+     * 2 CENTER ALIGNED
+     * 3 UNIFIED CLUSTER
+     */
+    
     public WordPosition() {
 	_word = null;
         _lineNb = -1;
+        
+        for(int i=0;i<4;i++) {
+            _clusterRef[i] = -1;
+        }
     }
     
     public boolean isNumber() {
@@ -42,7 +54,7 @@ public class WordPosition
 	_x1 = x1;
 	_y1 = y1;
 	_x2 = x2;
-	_y2 = y2;
+	_y2 = y2;  
     }
     
     public void trimSpaces() {
@@ -78,12 +90,15 @@ public class WordPosition
     public void fontSize(float fontSize) { _fontSize = fontSize; }
     public float fontSize() { return _fontSize; };
     
-    public String toString() 
+    public String toString() {
+        return toString("\t");
+    }
+    public String toString(String sep) 
     {
-	return Float.toString(_x1) + "\t" + 
-                Float.toString(_x2) + "\t" + 
-                Float.toString(_y1) + "\t" + 
-                Float.toString(_y2) + "\t" + 
+	return Float.toString(_x1) + sep + 
+                Float.toString(_x2) + sep + 
+                Float.toString(_y1) + sep + 
+                Float.toString(_y2) + sep + 
                 _word;
     }
     
@@ -92,5 +107,4 @@ public class WordPosition
         _x1 = Math.min(_x1, other.x1());
         _x2 = Math.max(_x2, other.x2());
     }
-    
 }
